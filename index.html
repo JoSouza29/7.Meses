@@ -140,12 +140,13 @@
 
   .hero.ready{ visibility:visible; }
 
+  /* título mais lento e suave, tom mais romântico */
   .hero .letter{
     display:inline-block;
     opacity:0;
-    transform:translateY(16px) rotate(2deg);
-    animation:letterIn .55s cubic-bezier(.2,.8,.3,1.2) forwards;
-    animation-delay:calc(var(--i) * .04s + .25s);
+    transform:translateY(20px) rotate(2deg);
+    animation:letterIn 1s cubic-bezier(.19,.84,.28,1) forwards;
+    animation-delay:calc(var(--i) * .085s + .3s);
   }
 
   @keyframes letterIn{
@@ -161,16 +162,37 @@
     padding:0 .06em;
   }
 
+  /* subtítulo: maior, com efeito de digitação controlado via JS */
   .subtitle{
     font-family:'Playfair Display', serif;
     font-style:italic;
     font-weight:500;
-    font-size:clamp(.95rem, 2.4vw, 1.15rem);
+    font-size:clamp(1.05rem, 3vw, 1.4rem);
     color:var(--blush);
-    margin:.9rem 0 0;
+    margin:1rem 0 0;
     opacity:0;
-    animation:fadeInUp 1s ease forwards;
-    animation-delay:1.6s;
+    transition:opacity .5s ease;
+    min-height:1.6em;
+  }
+
+  .subtitle.visible{ opacity:1; }
+
+  .typing-cursor{
+    display:inline-block;
+    margin-left:2px;
+    color:var(--gold-light);
+    animation:blink .8s steps(1) infinite;
+  }
+
+  .typing-cursor.cursor-hidden{
+    animation:none;
+    opacity:0;
+    transition:opacity .4s ease;
+  }
+
+  @keyframes blink{
+    0%,49%{ opacity:1; }
+    50%,100%{ opacity:0; }
   }
 
   @keyframes fadeInUp{
@@ -178,18 +200,24 @@
     to{ opacity:1; transform:translateY(0); }
   }
 
+  /* imagem: entra sincronizada com a digitação, via classe .visible */
   .locket-wrap{
     margin:2.6rem auto 1rem;
     opacity:0;
+  }
+
+  .locket-wrap.visible{
     animation:fadeInUp .6s ease forwards;
-    animation-delay:1.8s;
   }
 
   .locket{
     position:relative;
     width:clamp(180px, 58vw, 340px);
+  }
+
+  .locket.floaty{
     animation:floaty 5s ease-in-out infinite;
-    animation-delay:3.1s;
+    animation-delay:1.3s;
   }
 
   @keyframes floaty{
@@ -203,8 +231,10 @@
     height:auto;
     filter:drop-shadow(0 18px 34px rgba(0,0,0,.5));
     opacity:0;
+  }
+
+  .locket img.visible{
     animation:settleIn 1.3s cubic-bezier(.22,1,.36,1) forwards;
-    animation-delay:1.85s;
   }
 
   @keyframes settleIn{
@@ -214,14 +244,17 @@
     100%{ opacity:1; transform:translateY(0) rotate(0deg) scale(1); }
   }
 
+  /* legenda embaixo da imagem: maior, aparece depois que a imagem surge */
   .caption{
     font-family:'Playfair Display', serif;
     font-style:italic;
-    font-size:clamp(.82rem, 2vw, .95rem);
+    font-size:clamp(.98rem, 2.6vw, 1.25rem);
     color:var(--gold-light);
     opacity:0;
+  }
+
+  .caption.visible{
     animation:fadeInUp .9s ease forwards;
-    animation-delay:2.9s;
   }
 
   .kiss-btn{
@@ -242,8 +275,10 @@
     touch-action:manipulation;
     transition:background .35s ease, color .35s ease, box-shadow .35s ease, transform .2s ease;
     opacity:0;
+  }
+
+  .kiss-btn.visible{
     animation:fadeInUp .9s ease forwards;
-    animation-delay:3.2s;
   }
 
   .kiss-btn:hover{
@@ -310,6 +345,8 @@
     }
     .hero{ visibility:visible; }
     .hero .letter{ opacity:1; transform:none; }
+    .subtitle, .locket-wrap, .locket img, .caption, .kiss-btn{ opacity:1; }
+    .typing-cursor{ display:none; }
   }
 </style>
 </head>
@@ -323,7 +360,7 @@
 
     <h1 class="hero" id="hero">Feliz <span class="num">7</span> Meses Juntos,<br>Meu Bem!</h1>
 
-    <p class="subtitle">O que começou com um chaveiro...</p>
+    <p class="subtitle" id="subtitle"><span id="subtitle-text"></span><span class="typing-cursor" id="typing-cursor" aria-hidden="true">|</span></p>
 
     <div class="locket-wrap">
       <div class="locket">
@@ -331,7 +368,7 @@
       </div>
     </div>
 
-    <p class="caption">Terminou em uma linda história de amor! ✦</p>
+    <p class="caption" id="caption">Terminou em uma linda história de amor! ✦</p>
 
     <button id="kiss-btn" class="kiss-btn">✦ Clique aqui ✦</button>
     <p id="hidden-note" class="hidden-note">Feliz Nosso Dia Meu Amor, Eu Te Amo Yaya.🤍</p>
@@ -342,7 +379,14 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
 
-      // ---- título letra por letra ----
+      const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      // ---- título letra por letra (mais lento, tom romântico) ----
+      // precisa bater com os valores usados em .hero .letter no CSS
+      const LETTER_BASE_DELAY = 0.3;   // s
+      const LETTER_STEP = 0.085;       // s
+      const LETTER_DURATION = 1;       // s
+
       function animateLetters(root){
         let i = 0;
         function walk(node){
@@ -366,8 +410,15 @@
         }
         Array.from(root.childNodes).forEach(walk);
         root.classList.add('ready');
+        return i; // total de letras animadas
       }
-      animateLetters(document.getElementById('hero'));
+
+      const heroEl = document.getElementById('hero');
+      const totalLetters = animateLetters(heroEl);
+
+      const heroTotalTime = prefersReduced
+        ? 0
+        : Math.round((LETTER_BASE_DELAY + (totalLetters - 1) * LETTER_STEP + LETTER_DURATION) * 1000);
 
       // ---- brilhos ambientes ----
       const sparkleContainer = document.getElementById('sparkles');
@@ -407,6 +458,56 @@
       }
       for (let i = 0; i < 3; i++){ setTimeout(spawnRainHeart, i * 1400); }
       setInterval(spawnRainHeart, 2800);
+
+      // ---- sequência romântica: digitação do subtítulo sincronizada com a imagem ----
+      const subtitleEl = document.getElementById('subtitle');
+      const subtitleTextEl = document.getElementById('subtitle-text');
+      const typingCursor = document.getElementById('typing-cursor');
+      const fullSubtitle = 'O que começou com um chaveiro...';
+      const locketWrap = document.querySelector('.locket-wrap');
+      const locketIcon = document.querySelector('.locket');
+      const locketImg = document.querySelector('.locket img');
+      const captionEl = document.getElementById('caption');
+      const kissBtn = document.getElementById('kiss-btn');
+
+      const IMG_SETTLE_DURATION = 1300; // ms, deve bater com "settleIn 1.3s" no CSS
+      const CAPTION_DURATION = 900;     // ms, deve bater com "fadeInUp .9s" no CSS
+      const TYPE_SPEED = prefersReduced ? 0 : 55; // ms por caractere
+
+      function revealSubtitleAndImage(){
+        subtitleEl.classList.add('visible');
+        locketWrap.classList.add('visible');
+        locketImg.classList.add('visible');
+        locketIcon.classList.add('floaty');
+
+        if (prefersReduced || TYPE_SPEED === 0){
+          subtitleTextEl.textContent = fullSubtitle;
+          typingCursor.classList.add('cursor-hidden');
+          return;
+        }
+
+        let idx = 0;
+        const typeInterval = setInterval(() => {
+          subtitleTextEl.textContent += fullSubtitle.charAt(idx);
+          idx++;
+          if (idx >= fullSubtitle.length){
+            clearInterval(typeInterval);
+            typingCursor.classList.add('cursor-hidden');
+          }
+        }, TYPE_SPEED);
+      }
+
+      function revealCaption(){
+        captionEl.classList.add('visible');
+      }
+
+      function revealButton(){
+        kissBtn.classList.add('visible');
+      }
+
+      setTimeout(revealSubtitleAndImage, heroTotalTime);
+      setTimeout(revealCaption, heroTotalTime + IMG_SETTLE_DURATION + 250);
+      setTimeout(revealButton, heroTotalTime + IMG_SETTLE_DURATION + 250 + CAPTION_DURATION + 250);
 
       // ---- toque no botão: chuvinha de corações + mensagem ----
       const btn = document.getElementById('kiss-btn');
